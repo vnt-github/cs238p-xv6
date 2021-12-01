@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "elf.h"
 
 struct {
   struct spinlock lock;
@@ -531,4 +532,187 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+int
+proc_newproc_exec(char *path, char **argv, struct proc *curproc)
+{
+  char *s, *last;
+  int i, off;
+  uint argc, sz, sp, ustack[3+MAXARG+1];
+  struct elfhdr elf;
+  struct inode *ip;
+  struct proghdr ph;
+  pde_t *pgdir;
+  // pde_t *pgdir, *oldpgdir;
+  // struct proc *curproc = myproc();
+
+  begin_op();
+
+  // cprintf("inside exec with path: %s\n", path);
+  if((ip = namei(path)) == 0){
+    end_op();
+    cprintf("exec: fail\n");
+    return -1;
+  }
+  ilock(ip);
+  pgdir = 0;
+
+  // Check ELF header
+  if(readi(ip, (char*)&elf, 0, sizeof(elf)) != sizeof(elf))
+    goto bad;
+  if(elf.magic != ELF_MAGIC)
+    goto bad;
+
+  if((pgdir = setupkvm()) == 0)
+    goto bad;
+
+  // Load program into memory.
+  sz = 0;
+  for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
+    if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
+      goto bad;
+    if(ph.type != ELF_PROG_LOAD)
+      continue;
+    if(ph.memsz < ph.filesz)
+      goto bad;
+    if(ph.vaddr + ph.memsz < ph.vaddr)
+      goto bad;
+    if((sz = allocuvm(pgdir, sz, ph.vaddr + ph.memsz)) == 0)
+      goto bad;
+    if(ph.vaddr % PGSIZE != 0)
+      goto bad;
+    if(loaduvm(pgdir, (char*)ph.vaddr, ip, ph.off, ph.filesz) < 0)
+      goto bad;
+  }
+  iunlockput(ip);
+  end_op();
+  ip = 0;
+
+  // Allocate two pages at the next page boundary.
+  // Make the first inaccessible.  Use the second as the user stack.
+  sz = PGROUNDUP(sz);
+  if((sz = allocuvm(pgdir, sz, sz + 2*PGSIZE)) == 0)
+    goto bad;
+  clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
+  sp = sz;
+
+  // Push argument strings, prepare rest of stack in ustack.
+  for(argc = 0; argv[argc]; argc++) {
+    if(argc >= MAXARG)
+      goto bad;
+    sp = (sp - (strlen(argv[argc]) + 1)) & ~3;
+    if(copyout(pgdir, sp, argv[argc], strlen(argv[argc]) + 1) < 0)
+      goto bad;
+    ustack[3+argc] = sp;
+  }
+  ustack[3+argc] = 0;
+
+  ustack[0] = 0xffffffff;  // fake return PC
+  ustack[1] = argc;
+  ustack[2] = sp - (argc+1)*4;  // argv pointer
+
+  sp -= (3+argc+1) * 4;
+  if(copyout(pgdir, sp, ustack, (3+argc+1)*4) < 0)
+    goto bad;
+
+  // Save program name for debugging.
+  for(last=s=path; *s; s++)
+    if(*s == '/')
+      last = s+1;
+  safestrcpy(curproc->name, last, sizeof(curproc->name));
+
+  // NOTE: we use the forked new process as curproc so we do not need to initialize oldpgdir to be freed in freevm.
+  // Commit to the user image.
+  // oldpgdir = curproc->pgdir;
+  curproc->pgdir = pgdir;
+  curproc->sz = sz;
+  curproc->tf->eip = elf.entry;  // main
+  curproc->tf->esp = sp;
+  switchuvm(curproc);
+  // if (oldpgdir) {
+  //   // cprintf("oldpgdir: %d\n", oldpgdir);
+  //   // freevm(oldpgdir);
+  //   // cprintf("oldpgdir freed\n");
+  // }
+  return 0;
+
+ bad:
+  if(pgdir)
+    freevm(pgdir);
+  if(ip){
+    iunlockput(ip);
+    end_op();
+  }
+  return -1;
+}
+
+int
+proc_newproc(char *path, char **argv)
+{
+  int i, pid;
+  struct proc *np;
+  struct proc *curproc = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  cprintf("inside proc_newproc process pid\n");
+
+  // *np->tf = *curproc->tf;
+
+  // NOTE: this is from userinit
+  np->tf->cs = (SEG_UCODE << 3) | DPL_USER;
+  np->tf->ds = (SEG_UDATA << 3) | DPL_USER;
+  np->tf->es = np->tf->ds;
+  np->tf->ss = np->tf->ds;
+
+  np->tf->gs = np->tf->ds;
+  np->tf->fs = np->tf->ds;
+  
+  np->tf->eflags = FL_IF;
+
+  // NOTE: below esp and eip will be overriden by proc_newproc_exec
+  // np->tf->esp = PGSIZE;
+  // np->tf->eip = 0;  // beginning of initcode.S
+
+  // exec copy here
+  if (proc_newproc_exec(path, argv, np) < 0) {
+    cprintf("proc_newproc_exec failed\n");
+    kfree(np->kstack);
+    np->kstack = 0;
+    np->state = UNUSED;
+    return -1;
+  }
+
+  // NOTE: np->sz will be set by proc_newproc_exec
+  // np->sz = curproc->sz;
+  // cprintf("np->sz: %d\n", np->sz);
+  np->parent = curproc;
+  // NOTE: we need to comment below else our trap frame will become equal to old proc which is wrong for our new process.
+  // *np->tf = *curproc->tf;
+
+  // Clear %eax so that fork returns 0 in the child.
+  np->tf->eax = 0;
+
+  for(i = 0; i < NOFILE; i++)
+    if(curproc->ofile[i])
+      np->ofile[i] = filedup(curproc->ofile[i]);
+  np->cwd = idup(curproc->cwd);
+
+  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+
+  pid = np->pid;
+
+  cprintf("new process pid: %d\n", pid);
+
+  acquire(&ptable.lock);
+
+  np->state = RUNNABLE;
+
+  release(&ptable.lock);
+
+  return pid;
 }
