@@ -714,5 +714,6 @@ proc_newproc(char *path, char **argv)
 
   release(&ptable.lock);
 
+  wait();
   return pid;
 }
