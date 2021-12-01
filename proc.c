@@ -647,8 +647,33 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
   return -1;
 }
 
-int
-proc_newproc(char *path, char **argv)
+int myforkret() {
+  char *path, *argv[MAXARG];
+  int i;
+  uint uargv, uarg;
+
+  if(argstr(0, &path) < 0 || argint(1, (int*)&uargv) < 0){
+    return -1;
+  }
+  memset(argv, 0, sizeof(argv));
+  for(i=0;; i++){
+    if(i >= NELEM(argv))
+      return -1;
+    if(fetchint(uargv+4*i, (int*)&uarg) < 0)
+      return -1;
+    if(uarg == 0){
+      argv[i] = 0;
+      break;
+    }
+    if(fetchstr(uarg, &argv[i]) < 0)
+      return -1;
+  }
+  release(&ptable.lock);
+  exec(argv[0], argv);
+  return -1;
+}
+
+int proc_newproc(void)
 {
   int i, pid;
   struct proc *np;
@@ -659,43 +684,21 @@ proc_newproc(char *path, char **argv)
     return -1;
   }
 
-  cprintf("proc.c: inside proc_newproc process\n");
-
-  // *np->tf = *curproc->tf;
-
-  // NOTE: this is from userinit
-  np->tf->cs = (SEG_UCODE << 3) | DPL_USER;
-  np->tf->ds = (SEG_UDATA << 3) | DPL_USER;
-  np->tf->es = np->tf->ds;
-  np->tf->ss = np->tf->ds;
-
-  np->tf->gs = np->tf->ds;
-  np->tf->fs = np->tf->ds;
-  
-  np->tf->eflags = FL_IF;
-
-  // NOTE: below esp and eip will be overriden by proc_newproc_exec
-  // np->tf->esp = PGSIZE;
-  // np->tf->eip = 0;  // beginning of initcode.S
-
-  // exec copy here
-  if (proc_newproc_exec(path, argv, np) < 0) {
-    cprintf("proc_newproc_exec failed\n");
+  // Copy process state from proc.
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
-
-  // NOTE: np->sz will be set by proc_newproc_exec
-  // np->sz = curproc->sz;
-  // cprintf("np->sz: %d\n", np->sz);
+  np->sz = curproc->sz;
   np->parent = curproc;
-  // NOTE: we need to comment below else our trap frame will become equal to old proc which is wrong for our new process.
-  // *np->tf = *curproc->tf;
+  *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
+  np->tf->esp = curproc->tf->esp;
+  np->context->eip = (uint)myforkret;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -705,8 +708,6 @@ proc_newproc(char *path, char **argv)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
-
-  cprintf("new process pid: %d\n", pid);
 
   acquire(&ptable.lock);
 
