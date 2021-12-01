@@ -1,6 +1,8 @@
 // user-level application to test the "newproc" syscall
 #include "types.h"
 #include "user.h"
+#include "fcntl.h"
+
 int
 main(int argc, char *argv[])
 {
@@ -15,9 +17,28 @@ main(int argc, char *argv[])
     const char *args[] = {"ls", 0};
     // const char *args[] = {"ls", "1", 0};
 
+    
+    int in = -1;
+    int out = -1;
+
+    // NOTE: below are for file redirections
+    // const char *args[] = {"cat", 0};
+    // const char *args[] = {"wc", 0};
+    // in = open("in.txt", O_CREATE|O_RDONLY);
+    // if(in < 0){
+    //     printf(1, "error: open redirection input file creation failed!\n");
+    //     exit();
+    // }
+    // out = open("out.txt", O_CREATE|O_RDWR);
+    // if(out < 0){
+    //     printf(1, "error: open redirection output file creation failed!\n");
+    //     exit();
+    // }
+
+
     int ret;
     printf(1, "Test newproc syscall\n");
-    ret = newproc(args[0], args);
+    ret = newproc(args[0], args, in, out);
     printf(1, "returned: %d\n", ret);
     exit();
 }

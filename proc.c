@@ -647,7 +647,7 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
 }
 
 int
-proc_newproc(char *path, char **argv)
+proc_newproc(char *path, char **argv, int in, int out)
 {
   int i, pid;
   struct proc *np;
@@ -682,6 +682,12 @@ proc_newproc(char *path, char **argv)
     if(curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
+
+  if (in >= 0 && in < NOFILE && curproc->ofile[in])
+    np->ofile[0] = filedup(curproc->ofile[in]);
+
+  if (out >= 0 && out < NOFILE && curproc->ofile[out])
+    np->ofile[1] = filedup(curproc->ofile[out]);
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 

@@ -94,10 +94,10 @@ int
 sys_newproc(void)
 {
   char *path, *argv[MAXARG];
-  int i;
+  int i, in, out;
   uint uargv, uarg;
 
-  if(argstr(0, &path) < 0 || argint(1, (int*)&uargv) < 0){
+  if(argstr(0, &path) < 0 || argint(2, &in) || argint(3, &out) || argint(1, (int*)&uargv) < 0){
     return -1;
   }
   memset(argv, 0, sizeof(argv));
@@ -113,5 +113,5 @@ sys_newproc(void)
     if(fetchstr(uarg, &argv[i]) < 0)
       return -1;
   }
-  return proc_newproc(path, argv);
+  return proc_newproc(path, argv, in, out);
 }
