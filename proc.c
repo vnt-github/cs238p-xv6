@@ -659,7 +659,7 @@ proc_newproc(char *path, char **argv)
     return -1;
   }
 
-  cprintf("inside proc_newproc process pid\n");
+  cprintf("proc.c: inside proc_newproc process\n");
 
   // *np->tf = *curproc->tf;
 

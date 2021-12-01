@@ -23,7 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int newproc(char*, char**);
+int newproc(const char*, const char**);
 
 // ulib.c
 int stat(const char*, struct stat*);
