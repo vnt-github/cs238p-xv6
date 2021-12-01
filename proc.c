@@ -549,7 +549,6 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
 
   begin_op();
 
-  // cprintf("inside exec with path: %s\n", path);
   if((ip = namei(path)) == 0){
     end_op();
     cprintf("exec: fail\n");
@@ -659,32 +658,14 @@ proc_newproc(char *path, char **argv)
     return -1;
   }
 
-  cprintf("proc.c: inside proc_newproc process\n");
-
-  // *np->tf = *curproc->tf;
-
-  // NOTE: this is from userinit
-  np->tf->cs = (SEG_UCODE << 3) | DPL_USER;
-  np->tf->ds = (SEG_UDATA << 3) | DPL_USER;
-  np->tf->es = np->tf->ds;
-  np->tf->ss = np->tf->ds;
-
-  np->tf->gs = np->tf->ds;
-  np->tf->fs = np->tf->ds;
-  
-  np->tf->eflags = FL_IF;
-
-  // NOTE: below esp and eip will be overriden by proc_newproc_exec
-  // np->tf->esp = PGSIZE;
-  // np->tf->eip = 0;  // beginning of initcode.S
+  *np->tf = *curproc->tf;
 
   // exec copy here
   if (proc_newproc_exec(path, argv, np) < 0) {
-    cprintf("proc_newproc_exec failed\n");
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
-    return -1;
+    return -2;
   }
 
   // NOTE: np->sz will be set by proc_newproc_exec
@@ -705,8 +686,6 @@ proc_newproc(char *path, char **argv)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
-
-  cprintf("new process pid: %d\n", pid);
 
   acquire(&ptable.lock);
 

@@ -11,20 +11,6 @@ main(int argc, char *argv[])
     int ret;
     printf(1, "Test newproc syscall\n");
     ret = newproc(args[0], args);
-    if(ret < 0){
-      printf(1, "newproc-test: newproc failed\n");
-      exit();
-    }
-
-    if (ret == 0) {
-        printf(1,"newproc-test child pid: %d\n", ret);
-        exit();
-    }
-
-    int wpid;
-    while((wpid=wait()) >= 0 && wpid != ret)
-      printf(1, "zombie!\n");
-
     printf(1, "returned: %d\n", ret);
     exit();
 }
