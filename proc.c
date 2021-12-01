@@ -556,8 +556,16 @@ int proc_newproc_exec() {
       return -1;
   }
   release(&ptable.lock);
-  exec(argv[0], argv);
-  return -1;
+  int exec_ret = exec(argv[0], argv);
+  // cprintf("exec_ret: %d\n", exec_ret);
+  if (exec_ret < 0) {
+    // cprintf("exec failed setting eax -2 of %d\n", myproc()->parent->pid);
+    myproc()->parent->tf->eax = -2;
+    kill(myproc()->pid);
+  } else {
+    myproc()->parent->tf->eax = myproc()->pid;
+  }
+  return exec_ret;
 }
 
 int proc_newproc(void)
@@ -584,7 +592,6 @@ int proc_newproc(void)
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
-  np->tf->esp = curproc->tf->esp;
   np->context->eip = (uint)proc_newproc_exec;
 
   for(i = 0; i < NOFILE; i++)
@@ -602,5 +609,10 @@ int proc_newproc(void)
 
   release(&ptable.lock);
 
-  return pid;
+  int wpid;
+  while((wpid=wait()) >= 0 && wpid != pid)
+    cprintf("zombie!\n");
+
+  // cprintf("curproc->tf->eax: %d\n", curproc->tf->eax);
+  return curproc->tf->eax;
 }
