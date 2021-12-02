@@ -621,7 +621,7 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
     if(*s == '/')
       last = s+1;
   safestrcpy(curproc->name, last, sizeof(curproc->name));
-
+  
   // NOTE: we use the forked new process as curproc so we do not need to initialize oldpgdir to be freed in freevm.
   // Commit to the user image.
   // oldpgdir = curproc->pgdir;
@@ -629,7 +629,7 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
-  switchuvm(curproc);
+  // switchuvm(curproc);
   // if (oldpgdir) {
   //   // cprintf("oldpgdir: %d\n", oldpgdir);
   //   // freevm(oldpgdir);
@@ -714,6 +714,5 @@ proc_newproc(char *path, char **argv)
 
   release(&ptable.lock);
 
-  wait();
   return pid;
 }
