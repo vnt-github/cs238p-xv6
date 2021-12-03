@@ -661,22 +661,7 @@ proc_newproc(char *path, char **argv)
 
   cprintf("proc.c: inside proc_newproc process\n");
 
-  // *np->tf = *curproc->tf;
-
-  // NOTE: this is from userinit
-  np->tf->cs = (SEG_UCODE << 3) | DPL_USER;
-  np->tf->ds = (SEG_UDATA << 3) | DPL_USER;
-  np->tf->es = np->tf->ds;
-  np->tf->ss = np->tf->ds;
-
-  np->tf->gs = np->tf->ds;
-  np->tf->fs = np->tf->ds;
-  
-  np->tf->eflags = FL_IF;
-
-  // NOTE: below esp and eip will be overriden by proc_newproc_exec
-  // np->tf->esp = PGSIZE;
-  // np->tf->eip = 0;  // beginning of initcode.S
+  *np->tf = *curproc->tf;
 
   // exec copy here
   if (proc_newproc_exec(path, argv, np) < 0) {
@@ -695,7 +680,7 @@ proc_newproc(char *path, char **argv)
   // *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
-  np->tf->eax = 0;
+  // np->tf->eax = 0;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
