@@ -687,7 +687,8 @@ proc_newproc(char *path, char **argv)
       np->ofile[i] = filedup(curproc->ofile[i]);
   np->cwd = idup(curproc->cwd);
 
-  safestrcpy(np->name, curproc->name, sizeof(curproc->name));
+  // NOTE: we do not want to override the name wet by proc_newproc_exec
+  // safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
 
