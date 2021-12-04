@@ -549,7 +549,6 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
 
   begin_op();
 
-  // cprintf("inside exec with path: %s\n", path);
   if((ip = namei(path)) == 0){
     end_op();
     cprintf("exec: fail\n");
@@ -629,7 +628,11 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+  // NOTE: when I call switchuvm it ends up switching my current processes(newproc-test) page table and current CPUs TSS to that of the child. Which ends up messing up the state of my current process when the child exits.
+  // Inside normal operations of exec (coupled with regular fork) switching the current process(newly created child) page table and current CPUs TSS is alright because in that case that exec needs to run switchuvm to allocate per process page table and per CPU GDT's TSS.
+  // so if we don't switchuvm here then when do we switchuvm? Ans: when the schedule picks this newly created process it calls switchuvm.
   // switchuvm(curproc);
+
   // if (oldpgdir) {
   //   // cprintf("oldpgdir: %d\n", oldpgdir);
   //   // freevm(oldpgdir);
@@ -659,17 +662,14 @@ proc_newproc(char *path, char **argv)
     return -1;
   }
 
-  cprintf("proc.c: inside proc_newproc process\n");
-
   *np->tf = *curproc->tf;
 
   // exec copy here
   if (proc_newproc_exec(path, argv, np) < 0) {
-    cprintf("proc_newproc_exec failed\n");
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
-    return -1;
+    return -2;
   }
 
   // NOTE: np->sz will be set by proc_newproc_exec
@@ -680,7 +680,7 @@ proc_newproc(char *path, char **argv)
   // *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
-  // np->tf->eax = 0;
+  np->tf->eax = 0;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -690,8 +690,6 @@ proc_newproc(char *path, char **argv)
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
   pid = np->pid;
-
-  cprintf("new process pid: %d\n", pid);
 
   acquire(&ptable.lock);
 
