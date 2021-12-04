@@ -628,7 +628,11 @@ proc_newproc_exec(char *path, char **argv, struct proc *curproc)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
-  switchuvm(curproc);
+  // NOTE: when I call switchuvm it ends up switching my current processes(newproc-test) page table and current CPUs TSS to that of the child. Which ends up messing up the state of my current process when the child exits.
+  // Inside normal operations of exec (coupled with regular fork) switching the current process(newly created child) page table and current CPUs TSS is alright because in that case that exec needs to run switchuvm to allocate per process page table and per CPU GDT's TSS.
+  // so if we don't switchuvm here then when do we switchuvm? Ans: when the schedule picks this newly created process it calls switchuvm.
+  // switchuvm(curproc);
+
   // if (oldpgdir) {
   //   // cprintf("oldpgdir: %d\n", oldpgdir);
   //   // freevm(oldpgdir);
@@ -699,6 +703,5 @@ proc_newproc(char *path, char **argv, int in, int out)
 
   release(&ptable.lock);
 
-  wait();
   return pid;
 }

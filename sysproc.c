@@ -97,9 +97,14 @@ sys_newproc(void)
   int i, in, out;
   uint uargv, uarg;
 
-  if(argstr(0, &path) < 0 || argint(2, &in) || argint(3, &out) || argint(1, (int*)&uargv) < 0){
+  if(argstr(0, &path) < 0 || argint(2, &in) < 0 || argint(3, &out) < 0 || argint(1, (int*)&uargv) < 0){
     return -1;
   }
+
+  // NOTE: in proc_newproc we do filedup(curproc->ofile[in]) so we need to make sure that they are valid.
+  if (in >= NOFILE || out > NOFILE)
+    return -1;
+  
   memset(argv, 0, sizeof(argv));
   for(i=0;; i++){
     if(i >= NELEM(argv))
