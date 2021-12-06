@@ -4,12 +4,12 @@
 int
 main(int argc, char *argv[])
 {
-    // const char *args[] = {"echo", "NEWPROC_CALL", 0};
+    const char *args[] = {"echo", "NEWPROC_CALL", 0};
     // const char *args[] = {"echo", "NEWPROC_CALL_TEST_FOR_MORE_STRING_LENGTH", "argument2", "argument3" , 0};
     // const char *args[] = {"mkdir", "new_dir", 0};
     // const char *args[] = {"cat", "README", 0};
     // const char *args[] = {"grep", "the", "README", 0};
-    const char *args[] = {"ls", 0};
+    // const char *args[] = {"ls", 0};
     
     // NOTE: this should give error -2. because the exec fails and it's not because of arguments. it's because ll command does not exists.
     // const char *args[] = {"ll", 0};
