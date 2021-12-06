@@ -11,7 +11,7 @@ main(int argc, char *argv[])
     // const char *args[] = {"mkdir", "new_dir", 0};
     // const char *args[] = {"cat", "README", 0};
     // const char *args[] = {"grep", "the", "README", 0};
-    const char *args[] = {"ls", 0};
+    // const char *args[] = {"ls", 0};
     
     // NOTE: this should give error -2. because the exec fails and it's not because of arguments. it's because ll command does not exists.
     // const char *args[] = {"ll", 0};
@@ -27,17 +27,17 @@ main(int argc, char *argv[])
 
     // NOTE: below are for file redirections
     // const char *args[] = {"cat", 0};
-    // const char *args[] = {"wc", 0};
-    // in = open("README", O_CREATE|O_RDONLY);
-    // if(in < 0){
-    //     printf(1, "error: open redirection input file creation failed!\n");
-    //     exit();
-    // }
-    // out = open("out.txt", O_CREATE|O_RDWR);
-    // if(out < 0){
-    //     printf(1, "error: open redirection output file creation failed!\n");
-    //     exit();
-    // }
+    const char *args[] = {"wc", 0};
+    in = open("README", O_CREATE|O_RDONLY);
+    if(in < 0){
+        printf(1, "error: open redirection input file creation failed!\n");
+        exit();
+    }
+    out = open("out.txt", O_CREATE|O_RDWR);
+    if(out < 0){
+        printf(1, "error: open redirection output file creation failed!\n");
+        exit();
+    }
 
     // NOTE: below setting in = 16 should return -1 as it's the incorrect argument to newproc as it's greater than or equal NOFILE
     // in = 18;
