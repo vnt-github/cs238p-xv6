@@ -43,7 +43,7 @@ main(int argc, char *argv[])
     // in = 18;
     int ret;
 
-    printf(1, "Test newproc syscall in: %d\n", in);
+    printf(1, "Test newproc syscall\n");
     ret = newproc(args[0], args, in, out);
     int wpid;
     while((wpid=wait()) >= 0 && wpid != ret);
